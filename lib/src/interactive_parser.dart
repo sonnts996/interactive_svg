@@ -1,16 +1,17 @@
 /*
  Created by sonnts996 on 15/10/25.
  Copyright (c) 2025 . All rights reserved.
+ MIT License
+ Modified by Lyana Goedtkindt (lyana.goedtkindt@ch.abb.com)
 */
 
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:xml/xml.dart';
 
 import '../interactive_svg.dart';
 import 'parsers/bounds_parser_utilities.dart';
 
-/// Concrete [InteractiveParserDelegate] that loads an SVG asset and extracts
+/// Concrete [InteractiveParserDelegate] that given an SVG-document string extracts
 /// interactive regions and hit-test bounds according to provided [InteractiveSelector]s.
 ///
 /// This implementation parses the SVG XML (via [loadAssets]) and exposes:
@@ -24,11 +25,32 @@ import 'parsers/bounds_parser_utilities.dart';
 /// 2. Call [parseSvg] to obtain per-selector SVG fragments.
 /// 3. Call [parseSvgBounds] to obtain path-based bounds (in SVG coordinates).
 class InteractiveParser extends InteractiveParserDelegate {
-  /// Creates an [InteractiveParser] with the given [asset] and [selectors].
-  InteractiveParser({required this.asset, this.selectors = const []});
+  /// Creates an [InteractiveParser] with the given [svgStringGetter] and [selectors].
+  InteractiveParser({required this.svgStringGetter, this.selectors = const []});
 
-  /// The SVG asset path to load.
-  final String asset;
+  // Create an InteractiveParser with a string as source
+  factory InteractiveParser.fromString({
+    required String svgString,
+    Iterable<InteractiveSelector> selectors = const [],
+  }) =>
+      InteractiveParser(
+        svgStringGetter: (_) async => svgString,
+        selectors: selectors,
+      );
+
+  // Create an InteractiveParser with an Asset as source
+  factory InteractiveParser.fromAssets({
+    required String svgAsset,
+    Iterable<InteractiveSelector> selectors = const [],
+  }) =>
+      InteractiveParser(
+        svgStringGetter: (context) =>
+            DefaultAssetBundle.of(context).loadString(svgAsset),
+        selectors: selectors,
+      );
+
+  /// The SVG-document string.
+  final Future<String> Function(BuildContext) svgStringGetter;
 
   /// The list of selectors defining interactive regions.C
   final Iterable<InteractiveSelector> selectors;
@@ -47,7 +69,7 @@ class InteractiveParser extends InteractiveParserDelegate {
             e.type == InteractiveType.boundsOnly,
       );
 
-  /// Loads the SVG asset and parses its XML document.
+  /// Initialise the state given the svgString and parses its XML document.
   ///
   /// This method must be awaited before calling [parseSvg] or [parseSvgBounds].
   @override
@@ -57,7 +79,7 @@ class InteractiveParser extends InteractiveParserDelegate {
     }
     _lock = true;
     try {
-      final svgString = await DefaultAssetBundle.of(context).loadString(asset);
+      final svgString = await svgStringGetter(context);
       final document = XmlDocument.parse(svgString);
       final svg = document.findElements('svg').firstOrNull;
       _currentContext = InteractiveParseContext(root: svg, document: document);
@@ -185,12 +207,10 @@ class InteractiveParser extends InteractiveParserDelegate {
 
   /// Checks if this parser is different from [other].
   ///
-  /// Returns true if the asset or selectors have changed.
+  /// The function in the original code was a lot more complex and honnestly can't figure out why...
   @override
   bool isChanged(covariant InteractiveParserDelegate other) {
-    if (other is! InteractiveParser) return true;
-    return other.asset != asset ||
-        !const DeepCollectionEquality().equals(other.selectors, selectors);
+    return this != other;
   }
 
   @override

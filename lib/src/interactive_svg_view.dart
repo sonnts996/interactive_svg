@@ -103,8 +103,8 @@ class InteractiveSvgView extends StatefulWidget {
   }) =>
       InteractiveSvgView(
         key: key,
-        parserDelegate: InteractiveParser(
-          asset: svgAssets,
+        parserDelegate: InteractiveParser.fromAssets(
+          svgAsset: svgAssets,
           selectors: selectors,
         ),
         errorBuilder: errorBuilder,

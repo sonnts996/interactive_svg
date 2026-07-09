@@ -1,13 +1,15 @@
 /*
  Created by sonnts996 on 19/10/25.
  Copyright (c) 2025 . All rights reserved.
+ MIT License
+ Modified by Lyana Goedtkindt (lyana.goedtkindt@ch.abb.com)
 */
 
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:xml/xml.dart';
 import 'package:path_drawing/path_drawing.dart';
 import 'package:vector_math/vector_math_64.dart' as v;
-import 'package:xml/xml.dart';
 
 /// Parses a single SVG group/element and composes a union [Path] suitable for hit-testing.
 ///
@@ -112,7 +114,7 @@ List<Path> collectDrawablePaths(XmlNode node, {bool skipMasks = true}) {
 // Apply inner clip-path and mask if present
     if (shapePath != null) {
       final localTransform = parseTransform(element.getAttribute('transform'));
-      if (localTransform != null) {
+      if (localTransform != null && tag != 'path') {
         shapePath = shapePath.transform(localTransform.storage);
       }
 
