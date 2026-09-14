@@ -13,12 +13,13 @@ abstract class _$InteractiveParseContextCWProxy {
 
   InteractiveParseContext viewBox(Rect? viewBox);
 
-  /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `InteractiveParseContext(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
+  /// Creates a new instance with the provided field values.
+  /// Passing `null` to a nullable field nullifies it, while `null` for a non-nullable field is ignored. To update a single field use `InteractiveParseContext(...).copyWith.fieldName(value)`.
   ///
-  /// Usage
+  /// Example:
   /// ```dart
   /// InteractiveParseContext(...).copyWith(id: 12, name: "My name")
-  /// ````
+  /// ```
   InteractiveParseContext call({
     XmlElement? root,
     XmlDocument? document,
@@ -26,7 +27,8 @@ abstract class _$InteractiveParseContextCWProxy {
   });
 }
 
-/// Proxy class for `copyWith` functionality. This is a callable class and can be used as follows: `instanceOfInteractiveParseContext.copyWith(...)`. Additionally contains functions for specific fields e.g. `instanceOfInteractiveParseContext.copyWith.fieldName(...)`
+/// Callable proxy for `copyWith` functionality.
+/// Use as `instanceOfInteractiveParseContext.copyWith(...)` or call `instanceOfInteractiveParseContext.copyWith.fieldName(value)` for a single field.
 class _$InteractiveParseContextCWProxyImpl
     implements _$InteractiveParseContextCWProxy {
   const _$InteractiveParseContextCWProxyImpl(this._value);
@@ -34,23 +36,24 @@ class _$InteractiveParseContextCWProxyImpl
   final InteractiveParseContext _value;
 
   @override
-  InteractiveParseContext root(XmlElement? root) => this(root: root);
+  InteractiveParseContext root(XmlElement? root) => call(root: root);
 
   @override
   InteractiveParseContext document(XmlDocument? document) =>
-      this(document: document);
+      call(document: document);
 
   @override
-  InteractiveParseContext viewBox(Rect? viewBox) => this(viewBox: viewBox);
+  InteractiveParseContext viewBox(Rect? viewBox) => call(viewBox: viewBox);
 
   @override
 
-  /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `InteractiveParseContext(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
+  /// Creates a new instance with the provided field values.
+  /// Passing `null` to a nullable field nullifies it, while `null` for a non-nullable field is ignored. To update a single field use `InteractiveParseContext(...).copyWith.fieldName(value)`.
   ///
-  /// Usage
+  /// Example:
   /// ```dart
   /// InteractiveParseContext(...).copyWith(id: 12, name: "My name")
-  /// ````
+  /// ```
   InteractiveParseContext call({
     Object? root = const $CopyWithPlaceholder(),
     Object? document = const $CopyWithPlaceholder(),
@@ -74,7 +77,8 @@ class _$InteractiveParseContextCWProxyImpl
 }
 
 extension $InteractiveParseContextCopyWith on InteractiveParseContext {
-  /// Returns a callable class that can be used as follows: `instanceOfInteractiveParseContext.copyWith(...)` or like so:`instanceOfInteractiveParseContext.copyWith.fieldName(...)`.
+  /// Returns a callable class used to build a new instance with modified fields.
+  /// Example: `instanceOfInteractiveParseContext.copyWith(...)` or `instanceOfInteractiveParseContext.copyWith.fieldName(...)`.
   // ignore: library_private_types_in_public_api
   _$InteractiveParseContextCWProxy get copyWith =>
       _$InteractiveParseContextCWProxyImpl(this);
