@@ -1,6 +1,6 @@
 name: interactive_svg
 description: "A lightweight Flutter package for rendering SVGs with selectable, interactive regions, supporting hit-testing, bounds extraction, and zoom/scroll functionality."
-version: 0.0.1+1
+version: 0.0.2
 homepage: https://github.com/sonnts996/interactive_svg
 
 environment:
@@ -10,20 +10,19 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_svg: ^2.1.0
+  flutter_svg: ^2.2.1
   path_drawing: ^1.0.1
-  xml: ^6.5.0
-  copy_with_extension: ^5.0.4
-  equatable: ^2.0.7
-  meta: ^1.15.0
-  collection: ^1.18.0
+  xml: ^6.6.1
+  copy_with_extension: ^10.0.1
+  meta: ^1.16.0
+  collection: ^1.19.1
   vector_math: ^2.2.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  build_runner: ^2.4.13
-  copy_with_extension_gen: ^5.0.4
+  build_runner: ^2.10.1
+  copy_with_extension_gen: ^10.0.1
   owlet_lints: ^5.0.0
 
 # For information on the generic Dart part of this file, see the

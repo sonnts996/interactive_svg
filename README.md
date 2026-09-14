@@ -132,6 +132,12 @@ To ensure reliable interactivity, follow these guidelines when creating SVGs:
 
 ## Limitations
 - **Performance**: Complex SVGs (e.g., large paths, many nodes, heavy filters, masks) may slow parsing and bounds computation. Simplify interactive regions where possible.
+
+> [!NOTE]
+> SVGs can render slowly when running in profile mode (for example using `flutter run --profile`).
+> However, when running from a built profile (`flutter build --profile`) they are typically faster and more stable.
+> Also, SVG rendering is often noticeably faster on subsequent renders — the slowdown is usually limited to the first load/parse.
+
 - **Bounds Timing**: Region bounds may be null on first build. Use `shouldRebuildWhenBoundsCalculated` to handle this.
 - **Hit-Testing**: Transparent pixels do not forward events; ensure shapes have a fill (even transparent).
 - **SVG Features**: Avoid heavy use of `<use>`, external references, or complex `<defs>`, as they may cause unexpected behavior in `flutter_svg`.

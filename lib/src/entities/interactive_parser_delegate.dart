@@ -18,14 +18,15 @@ part 'interactive_parser_delegate.g.dart';
 /// Implementations must:
 /// - load SVG content in [loadAssets] (this prepares internal parsing context, viewBox, etc.),
 /// - return a mapping of selectors to rendered SVG fragments via [parseSvg],
-/// - compute hit-test paths for touchable regions via [parseSvgBounds].
+/// - compute hit-test paths for touchable regions via [parseSvgBounds],
+/// - transform SVG coordinate-space bounds into widget/render space via [scaleSvgBounds].
 ///
 /// Important semantics:
-/// - [loadAssets] should be awaited before calling [parseSvg] or [parseSvgBounds].
+/// - [loadAssets] MUST be awaited before calling [parseSvg] or [parseSvgBounds].
 /// - [parseSvg] returns a [RegionList] where the `null` key holds the base/full SVG string.
-/// - [parseSvgBounds] returns a [BoundsList] mapping selectors to [SvgBounds]; implementers should
-///   transform paths into the coordinate space of the rendered widget using the provided `size`,
-///   `fit` and `alignment`.
+/// - [parseSvgBounds] returns a [BoundsList] mapping selectors to [SvgBounds] in the SVG's native
+///   coordinate system (viewBox). Use [scaleSvgBounds] to convert those paths into the coordinate
+///   space of the rendered widget, providing `size`, `fit` and `alignment`.
 /// - [isChanged] should return true when the delegate's inputs (e.g., asset path or selectors)
 ///   differ from another instance, so callers know to reload resources.
 abstract class InteractiveParserDelegate {
@@ -45,12 +46,22 @@ abstract class InteractiveParserDelegate {
 
   /// Returns a map of touchable path bounds for interactive objects.
   ///
-  /// The returned paths are expected to be in the coordinate space of the rendered widget
-  /// given [size], with transformations applied according to [fit] and [alignment].
-  BoundsList parseSvgBounds(
-    Size size, {
-    BoxFit fit = BoxFit.contain,
+  /// The returned [SvgBounds.path] entries are expressed in the original SVG
+  /// document coordinate space (the SVG viewBox). This method does not perform
+  /// any widget-size scaling; to convert these bounds into widget/device
+  /// coordinates call [scaleSvgBounds] with the desired `size`, `fit`, and
+  /// `alignment`.
+  BoundsList parseSvgBounds();
+
+  /// Scales a set of [BoundsList] entries from SVG coordinate space (viewBox) into the
+  /// target widget coordinate space ([size]) using [fit] and [alignment].
+  ///
+  /// Implementations may rely on internal viewBox information populated by [loadAssets].
+  BoundsList scaleSvgBounds(
+    BoundsList boundsList, {
+    Size size = Size.zero,
     Alignment alignment = Alignment.topLeft,
+    BoxFit fit = BoxFit.contain,
   });
 
   /// Returns true if there is at least one touchable item in the SVG.

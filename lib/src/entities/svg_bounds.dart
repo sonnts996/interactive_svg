@@ -15,7 +15,7 @@ import '../../interactive_svg.dart';
 /// Usage notes:
 /// - [path] should be in the same coordinate space as the rendered SVG content
 ///   (i.e. already transformed according to viewBox / fit / alignment).
-/// - The [bounds] getter returns an axis-aligned bounding rect computed from the
+/// - The [getVisibleBounds] getter returns an axis-aligned bounding rect computed from the
 ///   visible portion of [path] (sampling-based approximation).
 /// - Use [contains] to perform a fast membership test; it first checks a quick
 ///   bounding-box containment before invoking the potentially expensive
@@ -53,9 +53,26 @@ class SvgBounds {
   /// then calls the more expensive `path.contains` when necessary.
   bool contains(Offset point) {
     // Quick bounding rect check before expensive contains()
-    if(path.getBounds().contains(point)) {
+    if (path.getBounds().contains(point)) {
       return path.contains(point);
     }
     return false;
   }
+
+  /// Creates a copy of this [SvgBounds] with the provided fields replaced.
+  ///
+  /// Useful for performing local modifications without mutating the original
+  /// instance. Any parameter left null will preserve the corresponding value
+  /// from the original.
+  SvgBounds copyWith({
+    Path? path,
+    InteractiveSelector? selector,
+  }) =>
+      SvgBounds(
+        path: path ?? this.path,
+        selector: selector ?? this.selector,
+      );
+
+  @override
+  String toString() => 'SvgBounds{path: $path, selector: $selector}';
 }

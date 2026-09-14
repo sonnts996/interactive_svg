@@ -4,7 +4,7 @@
 */
 
 import 'package:collection/collection.dart';
-import 'package:equatable/equatable.dart';
+import 'package:meta/meta.dart';
 import 'package:xml/xml.dart';
 
 /// The type of interactivity for a selector region.
@@ -54,11 +54,8 @@ enum InteractiveType {
 /// Important: the selector API returns a matched XmlNode (or null) rather than a boolean.
 /// Implementations should return the first matching descendant node (or null when no match).
 /// This allows callers to obtain the actual node to render or inspect.
-///
-/// Equality is provided via [Equatable]. Note: `props` currently include `[id, type]`,
-/// so `label` is not part of the equality comparison intentionally (labels are considered
-/// presentation metadata).
-abstract class InteractiveSelector extends Equatable {
+@immutable
+abstract class InteractiveSelector {
   /// Creates an [InteractiveSelector].
   ///
   /// [id] identifies the target element(s) in the SVG (implementation-specific).
@@ -130,7 +127,15 @@ abstract class InteractiveSelector extends Equatable {
   String toString() => 'InteractiveSelector($label)';
 
   @override
-  List<Object?> get props => [id, type];
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! InteractiveSelector) return false;
+
+    return other.id == id && other.type == type;
+  }
+
+  @override
+  int get hashCode => Object.hash(id, type);
 }
 
 /// A selector that matches SVG elements by their `id` attribute.

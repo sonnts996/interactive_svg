@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 
 import '../interactive_svg.dart';
+import 'entities/bounds_cache.dart';
 
 /// A [BoundsFactory] implementation that lazily computes and caches SVG region bounds.
 ///
@@ -13,9 +14,13 @@ import '../interactive_svg.dart';
 /// widget that contains the SVG. Bounds are computed by delegating to the
 /// provided [InteractiveParserDelegate] via `parseSvgBounds`.
 ///
+/// This factory caches scaled results keyed by [BoundsCachedData] (size + fit + alignment)
+/// so repeated resolves for the same layout do not re-scale paths unnecessarily.
+///
 /// Typical usage:
 /// - Create this factory with the widget's [GlobalKey] and a parser delegate.
 /// - Call [load] (typically after layout / in a post-frame callback) to compute bounds.
+/// - Call [resolve] with the current widget size to obtain scaled bounds (cached when possible).
 /// - Listen for changes on this factory to be notified when bounds are available.
 ///
 /// Important semantics:
@@ -40,6 +45,8 @@ class LazyBoundsFactory extends BoundsFactory {
   /// The [GlobalKey] used to find the widget's [RenderBox] and size.
   final GlobalKey key;
 
+  final BoundsCache _cache = BoundsCache();
+
   /// The parser delegate responsible for extracting SVG bounds.
   InteractiveParserDelegate _parserDelegate;
 
@@ -56,9 +63,32 @@ class LazyBoundsFactory extends BoundsFactory {
   ///
   /// This getter never returns null; callers can safely read it without null checks.
   @override
-  BoundsList get data {
+  BoundsList get data => _cache.current ?? BoundsList();
+
+  @override
+  BoundsList resolve(
+    Size size, {
+    BoxFit fit = BoxFit.contain,
+    Alignment alignment = Alignment.topLeft,
+  }) {
     if (_boundsSnapshot.hasData) {
-      return _boundsSnapshot.data!;
+      final cachedData = BoundsCachedData(
+        size: size,
+        fit: fit,
+        alignment: alignment,
+      );
+      final bounds = _cache[cachedData];
+      if (bounds != null) {
+        return bounds;
+      }
+      _cache[cachedData] = _parserDelegate.scaleSvgBounds(
+        _boundsSnapshot.data!,
+        size: size,
+        fit: fit,
+        alignment: alignment,
+      );
+      notifyListeners();
+      return _cache[cachedData] ?? BoundsList();
     }
     return BoundsList();
   }
@@ -78,40 +108,26 @@ class LazyBoundsFactory extends BoundsFactory {
     if (parserDelegate != null) {
       _parserDelegate = parserDelegate;
     }
+    _cache.clear();
     _updateSnapshot(const AsyncSnapshot.nothing());
   }
 
-  /// Loads and computes the SVG bounds for the current widget size.
+  /// Loads (computes) SVG bounds and updates the internal snapshot.
   ///
-  /// [fit] and [alignment] control how the SVG is fitted to the widget.
-  /// If the widget's RenderBox is not yet attached (size unavailable), this
-  /// method will return an empty [BoundsList] and notify listeners.
-  ///
-  /// Any exception thrown during parsing is captured and stored in the snapshot,
-  /// and listeners are notified so consumers can handle the error (e.g., logging).
+  /// This method calls `_parserDelegate.parseSvgBounds()` to obtain unscaled
+  /// bounds expressed in the SVG's coordinate space (viewBox) and stores the
+  /// result in the snapshot. Callers should ensure the parser delegate has
+  /// been prepared (e.g. `await parserDelegate.loadAssets(context)`) before
+  /// calling `load()`.
   @override
-  void load({
-    BoxFit fit = BoxFit.contain,
-    Alignment alignment = Alignment.topLeft,
-  }) {
+  void load() {
+    _cache.clear();
     _updateSnapshot(const AsyncSnapshot.waiting());
     try {
-      final renderBox = key.currentContext?.findRenderObject() as RenderBox?;
-      if (renderBox != null) {
-        final size = renderBox.size;
-        final bounds = _parserDelegate.parseSvgBounds(
-          size,
-          fit: fit,
-          alignment: alignment,
-        );
-        _updateSnapshot(
-          AsyncSnapshot.withData(ConnectionState.done, bounds),
-        );
-      } else {
-        _updateSnapshot(
-          AsyncSnapshot.withData(ConnectionState.done, BoundsList()),
-        );
-      }
+      final bounds = _parserDelegate.parseSvgBounds();
+      _updateSnapshot(
+        AsyncSnapshot.withData(ConnectionState.done, bounds),
+      );
     } catch (e, st) {
       _updateSnapshot(
         AsyncSnapshot.withError(ConnectionState.done, e, st),

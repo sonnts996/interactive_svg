@@ -3,6 +3,7 @@
  Copyright (c) 2025 . All rights reserved.
 */
 
+import 'package:flutter/cupertino.dart';
 import 'package:interactive_svg/interactive_svg.dart';
 
 /// When exporting an SVG file from Figma, any duplicate IDs are automatically renamed
@@ -11,6 +12,7 @@ import 'package:interactive_svg/interactive_svg.dart';
 /// Duplicate IDs can cause errors or incorrect rendering in browsers or other tools.
 /// For example, if two elements share the ID `shape`, Figma will rename them to
 /// `shape` and `shape_2` during export to maintain compatibility and functionality.
+@immutable
 class TeethInteractiveSelector extends InteractiveSelectorByID {
   const TeethInteractiveSelector({
     required String id,
@@ -28,5 +30,12 @@ class TeethInteractiveSelector extends InteractiveSelectorByID {
   final String group;
 
   @override
-  List<Object?> get props => [id, group];
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! TeethInteractiveSelector) return false;
+    return id == other.id && group == other.group;
+  }
+
+  @override
+  int get hashCode => id.hashCode ^ group.hashCode;
 }

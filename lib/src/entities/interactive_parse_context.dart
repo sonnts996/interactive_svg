@@ -8,11 +8,12 @@ part of 'interactive_parser_delegate.dart';
 /// Holds parsed XML state for an SVG document.
 ///
 /// - [document]: the full parsed XmlDocument.
-/// - [root]: the <svg> root element (may be null if parsing failed).
+/// - [root]: the `<svg>` root element (may be null if parsing failed).
 /// - [viewBox]: the parsed viewBox rect when available. This is used to map SVG
 ///   coordinates into widget coordinates when computing bounds.
 @CopyWith()
 class InteractiveParseContext {
+  /// Creates a new [InteractiveParseContext] with the given fields.
   InteractiveParseContext({
     this.root,
     this.document,

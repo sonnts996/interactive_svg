@@ -3,7 +3,6 @@
  Copyright (c) 2025 . All rights reserved.
 */
 
-import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 
 import '../../interactive_svg.dart';
@@ -16,7 +15,8 @@ import 'interactive_selector.dart';
 ///   content (i.e. non-selective base layer).
 /// - [svg] contains the raw SVG string fragment to render for this region.
 @immutable
-class SvgRegion extends Equatable {
+class SvgRegion {
+  /// Creates a new [SvgRegion] with the given fields.
   const SvgRegion({
     required this.selector,
     required this.svg,
@@ -30,5 +30,25 @@ class SvgRegion extends Equatable {
   final String svg;
 
   @override
-  List<Object?> get props => [selector, svg];
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SvgRegion && selector == other.selector && svg == other.svg;
+
+  @override
+  int get hashCode => selector.hashCode ^ svg.hashCode;
+
+  /// Returns a copy of this [SvgRegion], replacing any provided fields.
+  ///
+  /// Leave parameters null to preserve existing values.
+  SvgRegion copyWith({
+    InteractiveSelector? selector,
+    String? svg,
+  }) =>
+      SvgRegion(
+        selector: selector ?? this.selector,
+        svg: svg ?? this.svg,
+      );
+
+  @override
+  String toString() => 'SvgRegion{selector: $selector, svg: $svg}';
 }

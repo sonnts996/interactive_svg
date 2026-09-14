@@ -3,7 +3,6 @@
  Copyright (c) 2025 . All rights reserved.
 */
 
-
 import 'package:flutter/material.dart';
 
 class BoundsPainter extends CustomPainter {
@@ -35,7 +34,7 @@ class BoundsPainter extends CustomPainter {
       canvas.drawCircle(offset, 5, dotPaint);
       final textSpan = TextSpan(
         text:
-        '(${offset.dx.toStringAsFixed(1)}, ${offset.dy.toStringAsFixed(1)})',
+            '(${offset.dx.toStringAsFixed(1)}, ${offset.dy.toStringAsFixed(1)})',
         style: textStyle,
       );
       final textPainter = TextPainter(

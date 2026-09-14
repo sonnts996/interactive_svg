@@ -3,14 +3,18 @@
  Copyright (c) 2025 . All rights reserved.
 */
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_svg/svg.dart';
 
 import '../interactive_svg.dart';
 import 'interactive_parser.dart';
 import 'lazy_bound_factory.dart';
+import 'widget/size_reporter.dart';
 
 /// A widget that renders an SVG asset and exposes interactive regions via [InteractiveSelector].
 ///
@@ -60,6 +64,7 @@ import 'lazy_bound_factory.dart';
 /// - [fit], [alignment]: Control SVG layout.
 /// - [errorBuilder], [placeholderBuilder]: Custom error/placeholder widgets.
 class InteractiveSvgView extends StatefulWidget {
+  /// Creates an [InteractiveSvgView] with the given [parserDelegate].
   const InteractiveSvgView({
     super.key,
     required this.parserDelegate,
@@ -205,31 +210,33 @@ class InteractiveSvgView extends StatefulWidget {
         onBoundsCalculated,
       ),
     );
+    properties.add(
+        ObjectFlagProperty<void Function()?>.has('onTapOutside', onTapOutside));
   }
 }
 
 class _InteractiveSvgViewState extends State<InteractiveSvgView> {
   final GlobalKey _sizedKey = GlobalKey();
 
-  late final BoundsFactory _boundsFactory;
+  late final BoundsFactory boundsFactory;
 
   AsyncSnapshot<RegionList> _regionSnapshot = const AsyncSnapshot.nothing();
 
   @override
   void initState() {
     super.initState();
-    _boundsFactory = LazyBoundsFactory(
+    boundsFactory = LazyBoundsFactory(
       key: _sizedKey,
       parserDelegate: widget.parserDelegate,
     );
-    _load();
-    _boundsFactory.addListener(_onBoundsCalculated);
+    load();
+    boundsFactory.addListener(_onBoundsCalculated);
   }
 
   @override
   void dispose() {
-    _boundsFactory.removeListener(_onBoundsCalculated);
-    _boundsFactory.dispose();
+    boundsFactory.removeListener(_onBoundsCalculated);
+    boundsFactory.dispose();
     super.dispose();
   }
 
@@ -241,21 +248,28 @@ class _InteractiveSvgViewState extends State<InteractiveSvgView> {
     if (widget.shouldRebuildWhenBoundsCalculated) {
       setState(() {});
     }
-    if (widget.onBoundsCalculated != null && _boundsFactory.hasData) {
-      widget.onBoundsCalculated?.call(_boundsFactory.data);
+    if (widget.onBoundsCalculated != null && boundsFactory.hasData) {
+      widget.onBoundsCalculated?.call(boundsFactory.data);
     }
   }
 
-  void _load() {
+  Future<void> _loadBounds() async {
+    if (widget.parserDelegate.hasTouchableItem || widget.onTap != null) {
+      boundsFactory.load();
+    }
+  }
+
+  void load() {
     SchedulerBinding.instance.addPostFrameCallback((_) async {
       try {
         setState(() {
           _regionSnapshot = const AsyncSnapshot.waiting();
-          _boundsFactory.reset(widget.parserDelegate);
+          boundsFactory.reset(widget.parserDelegate);
         });
         await widget.parserDelegate.loadAssets(context);
         if (!mounted) return;
         final data = widget.parserDelegate.parseSvg();
+        unawaited(_loadBounds());
         setState(
           () => _regionSnapshot =
               AsyncSnapshot.withData(ConnectionState.done, data),
@@ -276,7 +290,7 @@ class _InteractiveSvgViewState extends State<InteractiveSvgView> {
   void didUpdateWidget(covariant InteractiveSvgView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.parserDelegate.isChanged(oldWidget.parserDelegate)) {
-      _load();
+      load();
     }
   }
 
@@ -323,7 +337,7 @@ class _InteractiveSvgViewState extends State<InteractiveSvgView> {
                 fit: widget.fit,
                 child: _SvgView(
                   key: _sizedKey,
-                  lazyBounds: _boundsFactory,
+                  lazyBounds: boundsFactory,
                   background: data[null],
                   alignment: Alignment.topLeft,
                   fit: BoxFit.contain,
@@ -339,8 +353,6 @@ class _InteractiveSvgViewState extends State<InteractiveSvgView> {
                   // alignment: widget.alignment,
                   // fit: widget.fit,
                   interactiveBuilder: widget.interactiveBuilder,
-                  shouldUseBounds: widget.parserDelegate.hasTouchableItem ||
-                      widget.onTap != null,
                   maskerBuilder: widget.markerBuilder,
                   onTap: widget.onTap?.call,
                   onTapOutside: widget.onTapOutside,
@@ -349,6 +361,14 @@ class _InteractiveSvgViewState extends State<InteractiveSvgView> {
             },
           )
       };
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(
+      DiagnosticsProperty<BoundsFactory>('boundsFactory', boundsFactory),
+    );
+  }
 }
 
 class _SvgView extends StatefulWidget {
@@ -362,7 +382,6 @@ class _SvgView extends StatefulWidget {
     this.onTap,
     this.onTapOutside,
     required this.lazyBounds,
-    this.shouldUseBounds = false,
     this.maskerBuilder,
   });
 
@@ -389,9 +408,6 @@ class _SvgView extends StatefulWidget {
 
   /// Lazy bounds factory used to compute and provide bounds for touchable regions.
   final BoundsFactory lazyBounds;
-
-  /// Whether to attempt to compute/render bounds for touchable regions.
-  final bool shouldUseBounds;
 
   /// Optional masker/overlay builder.
   final MarkerBuilder? maskerBuilder;
@@ -444,94 +460,51 @@ class _SvgView extends StatefulWidget {
     );
     properties.add(
       FlagProperty(
-        'shouldUseBounds',
-        value: shouldUseBounds,
-        ifTrue: 'true',
-        ifFalse: 'false',
-      ),
-    );
-    properties.add(
-      FlagProperty(
         'hasMaskerBuilder',
         value: maskerBuilder != null,
         ifTrue: 'true',
         ifFalse: 'false',
       ),
     );
+    properties.add(
+        ObjectFlagProperty<void Function()?>.has('onTapOutside', onTapOutside));
   }
 }
 
 class _SvgViewState extends State<_SvgView> {
-  /// Request the lazy bounds factory to compute bounds if `widget.shouldUseBounds` is true.
-  void _loadBounds() {
-    if (widget.shouldUseBounds) {
-      widget.lazyBounds.load(
-        alignment: widget.alignment,
-        fit: widget.fit,
-      );
-    }
-  }
-
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadBounds();
-    });
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
-  @override
-  void didUpdateWidget(covariant _SvgView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    var markedForReload = false;
-    if (oldWidget.shouldUseBounds != widget.shouldUseBounds &&
-        widget.shouldUseBounds) {
-      markedForReload = true;
-    }
-    if (widget.shouldUseBounds &&
-        (oldWidget.alignment != widget.alignment ||
-            oldWidget.fit != widget.fit)) {
-      markedForReload = true;
-    }
-    if (oldWidget.lazyBounds != widget.lazyBounds) {
-      markedForReload = true;
-    }
-    if (markedForReload == true) {
-      _loadBounds();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTapUp: onTap,
-        child: Stack(
-          fit: StackFit.loose,
-          children: [
-            if (widget.background != null)
-              _buildSvg(null, widget.background!.svg),
-            ...widget.regions.map(
-              (e) {
-                final selector = e.selector!;
-                if (widget.interactiveBuilder != null) {
-                  return widget.interactiveBuilder!(
-                    context,
-                    () => _buildSvg(selector.id, e.svg),
-                    SvgRegionsDetails(
-                      selector: selector,
-                      bounds: widget.lazyBounds.data[selector],
-                    ),
-                  );
-                }
-                return _buildSvg(selector.id, e.svg);
-              },
-            ),
-            if (widget.maskerBuilder != null) ...widget.maskerBuilder!(context),
-          ],
+  Widget build(BuildContext context) => SizeReporter(
+        onSizeChanged: (size) {
+          widget.lazyBounds
+              .resolve(size, alignment: widget.alignment, fit: widget.fit);
+        },
+        child: GestureDetector(
+          onTapUp: onTap,
+          child: Stack(
+            fit: StackFit.loose,
+            children: [
+              if (widget.background != null)
+                _buildSvg(null, widget.background!.svg),
+              ...widget.regions.map(
+                (e) {
+                  final selector = e.selector!;
+                  if (widget.interactiveBuilder != null) {
+                    return widget.interactiveBuilder!(
+                      context,
+                      () => _buildSvg(selector.id, e.svg),
+                      SvgRegionsDetails(
+                        selector: selector,
+                        bounds: widget.lazyBounds.data[selector],
+                      ),
+                    );
+                  }
+                  return _buildSvg(selector.id, e.svg);
+                },
+              ),
+              if (widget.maskerBuilder != null)
+                ...widget.maskerBuilder!(context),
+            ],
+          ),
         ),
       );
 
@@ -565,7 +538,9 @@ class _SvgViewState extends State<_SvgView> {
     var isHandled = false;
     for (var i = regionList.length - 1; i >= 0; i--) {
       final selector = regionList[i].selector;
-      if (selector == null || selector.type != InteractiveType.touchable) continue;
+      if (selector == null || selector.type != InteractiveType.touchable) {
+        continue;
+      }
       final svgBounds = bounds[selector];
       if (svgBounds == null) continue;
       if (svgBounds.contains(touchPosition)) {
@@ -574,7 +549,7 @@ class _SvgViewState extends State<_SvgView> {
         break;
       }
     }
-    if(!isHandled) {
+    if (!isHandled) {
       widget.onTapOutside?.call();
     }
   }

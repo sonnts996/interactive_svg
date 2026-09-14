@@ -28,4 +28,8 @@ class SvgRegionsDetails {
 
   /// The computed bounds (may be null until layout/bounds calculation completes).
   final SvgBounds? bounds;
+
+  @override
+  String toString() =>
+      'SvgRegionsDetails{selector: $selector, bounds: $bounds}';
 }

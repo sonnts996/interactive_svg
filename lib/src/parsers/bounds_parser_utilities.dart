@@ -9,57 +9,13 @@ import 'package:path_drawing/path_drawing.dart';
 import 'package:vector_math/vector_math_64.dart' as v;
 import 'package:xml/xml.dart';
 
-/// Parses a single SVG group/element and composes a union [Path] suitable for hit-testing,
-/// along with its bounding [Rect]. Ensures bounds match the frame size if provided.
+/// Parses a single SVG group/element and composes a union [Path] suitable for hit-testing.
 ///
-/// The method:
-/// - Collects drawable elements (<path>, <rect>, <circle>, <ellipse>, <polygon>, <polyline>, <line>, <use>),
-///   excluding those inside <mask>.
-/// - Applies clip-path and mask on individual elements (inner) via collectDrawablePaths.
-/// - Handles transforms (matrix(...)) found on the element or its parents.
-/// - Scales/translates the final path according to provided [viewBox], [size], [fit], and [alignment].
-/// - Overrides viewBox to match frameSize if provided, ensuring bounds match Figma frame.
-///
-/// Returns a map with 'path' (union Path, or null if no usable path) and 'bounds' (Rect, or null if no path).
-Path? parseBoundsFromSvg(
-  XmlNode data, {
-  Size? size,
-  Rect? viewBox,
-  Size? frameSize,
-  BoxFit fit = BoxFit.none,
-  Alignment alignment = Alignment.topLeft,
-}) {
-  // Obtain viewBox from the SVG root if not provided
-  if (viewBox == null) {
-    final svgNode = data.document?.rootElement;
-    if (svgNode != null) {
-      final vbStr = svgNode.getAttribute('viewBox');
-      if (vbStr != null) {
-        final vbValues =
-            vbStr.split(RegExp(r'\s+|,')).map(double.tryParse).toList();
-        if (vbValues.length == 4) {
-          viewBox = Rect.fromLTWH(
-            vbValues[0]!,
-            vbValues[1]!,
-            vbValues[2]!,
-            vbValues[3]!,
-          );
-        }
-      }
-      viewBox ??= Rect.fromLTWH(
-        0,
-        0,
-        double.parse(svgNode.getAttribute('width') ?? '0'),
-        double.parse(svgNode.getAttribute('height') ?? '0'),
-      );
-    }
-  }
-
-  // Override viewBox when frameSize is provided
-  if (frameSize != null) {
-    viewBox = Rect.fromLTWH(0, 0, frameSize.width, frameSize.height);
-  }
-
+/// The returned [Path] is a union of drawable shapes found inside [data]. If any
+/// transform attributes exist on the element or its parents (matrix(...)), the
+/// first found transform is applied to the composed path. Mask and clip-path are
+/// respected where possible. If no drawable content is found this function returns null.
+Path? parseBoundsFromSvg(XmlNode data) {
   final subpaths = collectDrawablePaths(data);
   Matrix4? transform;
   XmlNode? current = data;
@@ -72,21 +28,13 @@ Path? parseBoundsFromSvg(
     current = current.parentElement;
   }
 
-  if (subpaths.isNotEmpty || frameSize != null) {
+  if (subpaths.isNotEmpty) {
     var combinedUnion = Path();
     for (final p in subpaths) {
       combinedUnion.addPath(p, Offset.zero);
     }
 
-    // Add Path for the frame rectangle if frameSize is provided
-    if (frameSize != null) {
-      final framePath = Path()
-        ..addRect(Rect.fromLTWH(0, 0, frameSize.width, frameSize.height));
-      combinedUnion =
-          Path.combine(PathOperation.union, combinedUnion, framePath);
-    }
-
-    // Handle stroke if present
+// Handle stroke if present
     final strokeWidth =
         double.tryParse(data.getAttribute('stroke-width') ?? '0') ?? 0;
     if (strokeWidth > 0) {
@@ -100,16 +48,7 @@ Path? parseBoundsFromSvg(
       combinedUnion = combinedUnion.transform(transform.storage);
     }
 
-    final scaledPath = scaleBounds(
-      combinedUnion,
-      viewBox: viewBox,
-      size: size ??
-          (frameSize != null ? Size(frameSize.width, frameSize.height) : null),
-      fit: fit,
-      alignment: alignment,
-    );
-
-    return scaledPath;
+    return combinedUnion;
   }
 
   return null;
@@ -128,13 +67,13 @@ List<Path> collectDrawablePaths(XmlNode node, {bool skipMasks = true}) {
   final element = node;
   final tag = element.name.local;
 
-  // Skip if display="none" or visibility="hidden"
+// Skip if display="none" or visibility="hidden"
   if (element.getAttribute('display') == 'none' ||
       element.getAttribute('visibility') == 'hidden') {
     return paths;
   }
 
-  // Skip invisible rect
+// Skip invisible rect
   if (tag == 'rect' &&
       element.getAttribute('opacity') == '0' &&
       element.getAttribute('fill') == 'none' &&
@@ -142,7 +81,7 @@ List<Path> collectDrawablePaths(XmlNode node, {bool skipMasks = true}) {
     return paths;
   }
 
-  // Skip contents inside <mask> when skipMasks=true
+// Skip contents inside <mask> when skipMasks=true
   if (skipMasks && tag == 'mask') return paths;
 
   Path? shapePath;
@@ -165,19 +104,19 @@ List<Path> collectDrawablePaths(XmlNode node, {bool skipMasks = true}) {
     } else if (tag == 'use') {
       shapePath = parseUse(element);
     } else if (tag == 'g') {
-      // Iterate children of <g> without creating a direct shapePath
+// Iterate children of <g> without creating a direct shapePath
     } else {
       return paths; // Skip tags that are not shapes
     }
 
-    // Apply inner clip-path and mask if present
+// Apply inner clip-path and mask if present
     if (shapePath != null) {
       final localTransform = parseTransform(element.getAttribute('transform'));
       if (localTransform != null) {
         shapePath = shapePath.transform(localTransform.storage);
       }
 
-      // Check clip-path on element
+// Check clip-path on element
       final clipPathUrl = element
           .getAttribute('clip-path')
           ?.replaceFirst('url(#', '')
@@ -204,7 +143,7 @@ List<Path> collectDrawablePaths(XmlNode node, {bool skipMasks = true}) {
         }
       }
 
-      // Check mask on element
+// Check mask on element
       final maskUrl = element
           .getAttribute('mask')
           ?.replaceFirst('url(#', '')
@@ -233,7 +172,7 @@ List<Path> collectDrawablePaths(XmlNode node, {bool skipMasks = true}) {
     debugPrint('Invalid $tag data: $e');
   }
 
-  // Recurse into children
+// Recurse into children
   for (final child in element.children) {
     paths.addAll(collectDrawablePaths(child, skipMasks: skipMasks));
   }
@@ -403,7 +342,10 @@ Path scaleBounds(
   BoxFit fit = BoxFit.none,
   Alignment alignment = Alignment.topLeft,
 }) {
-  if (size != null && viewBox != null) {
+  if (size != null &&
+      size != Size.zero &&
+      viewBox != null &&
+      viewBox.size != Size.zero) {
     var scaleX = size.width / viewBox.width;
     var scaleY = size.height / viewBox.height;
     var translateX = -viewBox.left;

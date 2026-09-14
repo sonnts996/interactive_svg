@@ -32,6 +32,18 @@ abstract class BoundsFactory extends ChangeNotifier {
   /// synchronous.
   BoundsList get data;
 
+  /// Resolve and return bounds adjusted for the given output [size].
+  ///
+  /// Implementations should scale/transform their stored SVG-space bounds into
+  /// the coordinate space defined by [size], using [fit] and [alignment] to
+  /// control how the SVG content maps into that size. Returns a [BoundsList]
+  /// ready for hit-testing in widget/render coordinates.
+  BoundsList resolve(
+    Size size, {
+    BoxFit fit = BoxFit.contain,
+    Alignment alignment = Alignment.topLeft,
+  });
+
   /// The current [ConnectionState] of the underlying bounds computation.
   ///
   /// Useful for driving UI state (e.g., showing a loading indicator while waiting
@@ -46,13 +58,13 @@ abstract class BoundsFactory extends ChangeNotifier {
   ///   data/state changed.
   void reset([InteractiveParserDelegate? parserDelegate]);
 
-  /// (Re)compute bounds using the current widget size, [fit] and [alignment].
+  /// Load raw bounds from the parser and update internal state.
   ///
-  /// Implementations should compute bounds synchronously or asynchronously, update
-  /// internal state accordingly, and call [notifyListeners] once results are available.
-  /// Callers that depend on layout should call this method from a post-frame callback.
-  void load({
-    BoxFit fit = BoxFit.contain,
-    Alignment alignment = Alignment.topLeft,
-  });
+  /// Implementations should obtain the list of bounds extracted from the SVG
+  /// (expressed in the SVG document coordinate space / viewBox), store or
+  /// update their internal snapshot/state with that unscaled data, and call
+  /// `notifyListeners()` once the load completes. Any conversion into
+  /// widget/device coordinates (scaling, fitting or alignment) should be
+  /// performed by calling `resolve(...)` (or the delegate's `scaleSvgBounds`).
+  void load();
 }
