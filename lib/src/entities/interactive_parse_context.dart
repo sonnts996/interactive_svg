@@ -20,7 +20,8 @@ class InteractiveParseContext {
     this.viewBox,
   });
 
-  /// The root <svg> element of the parsed document.
+  /// The root `<svg>` element of the parsed document.
+  /// Phần tử `<svg>` gốc của tài liệu đã phân tích.
   final XmlElement? root;
 
   /// The full parsed XML document.
