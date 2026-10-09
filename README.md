@@ -18,9 +18,11 @@ A lightweight Flutter package for rendering SVGs with selectable, interactive re
 ## Features
 - Render SVGs with interactive regions.
 - Select elements by ID or group using `InteractiveSelector`.
-- Handle taps and hovers with `onTap` and `onHover` callbacks, providing `SvgRegionsDetails` (bounds may be null on first build).
+- Handle region taps with `onTap` and optional outside taps with `onTapOutside`.
 - Support for bounds calculation, lazy bounds, and zoom/scroll wrappers.
 - Customizable overlays via `interactiveBuilder`.
+- Load SVG documents from Flutter assets, strings, local files, or network URLs.
+- Approximate hit-test bounds for simple SVG `<text>` elements.
 
 ## Getting Started
 ### Installation
@@ -46,7 +48,7 @@ final selectors = [
 ];
 
 // Render SVG with interactive regions
-InteractiveSvgView.fromAsset(
+InteractiveSvgView.fromAssets(
   svgAssets: 'assets/teeth.svg',
   selectors: selectors,
   shouldRebuildWhenBoundsCalculated: true,
@@ -56,33 +58,55 @@ InteractiveSvgView.fromAsset(
   placeholderBuilder: (context) => const Center(
     child: CircularProgressIndicator(),
   ),
-  onTap: (details) {
-    // Handle tap events
-    if (details.selector != null) {
-      print('Tapped region: ${details.selector!.id}');
-    } else {
-      print('Tapped outside defined regions');
-    }
-  },
-  interactiveBuilder: (context, view, details) {
-    // Add overlays for interactive regions
-    if (details.selector?.id == 'tooth-1' && details.bounds != null) {
-      return CustomPaint(
-        foregroundPainter: LabelPainter(
-          label: details.selector!.id,
-          bounds: details.bounds!.bounds,
-        ),
-        child: view,
-      );
-    }
-    return view;
-  },
+  onTap: (selector) => print('Tapped region: ${selector.id}'),
+  onTapOutside: () => print('Tapped outside defined regions'),
 )
 ```
 
+### SVG sources
+
+The asset constructor remains available for existing applications:
+
+```dart
+InteractiveSvgView.fromAssets(
+  svgAssets: 'assets/teeth.svg',
+  selectors: selectors,
+  onTap: (selector) => print('Tapped ${selector.id}'),
+)
+```
+
+Use a provider when the SVG comes from another source:
+
+```dart
+InteractiveSvgView.fromProvider(
+  provider: InteractiveSvgProvider.string(svgString),
+  selectors: selectors,
+  onTap: (selector) => print('Tapped ${selector.id}'),
+)
+```
+
+Available providers are:
+
+- `InteractiveSvgProvider.string(svgString)` for SVG text already in memory.
+- `InteractiveSvgProvider.asset(assetName)` for a Flutter asset.
+- `InteractiveSvgProvider.file(filePath)` for a local file on platforms with
+  `dart:io` support. Local files are not supported on web.
+- `InteractiveSvgProvider.network(url)` for an HTTP or HTTPS URL.
+
+Provider equality determines whether `InteractiveSvgView` reloads. A new string
+value is detected automatically when the parent rebuilds. Asset, file, and
+network providers compare their path or URL; if content changes at the same
+location, recreate the view with a new `Key` (for example a revision-based
+`ValueKey`) to force a reload. Editing a `const` SVG during development may
+require hot restart because hot reload does not recreate every canonicalized
+constant.
+
 ### Notes
-- Use `onTap` or `onHover` for hit-testing instead of `GestureDetector` in `interactiveBuilder`, as `flutter_svg` does not forward pointer events through transparent pixels.
+- Use `onTap` for hit-testing instead of `GestureDetector` in `interactiveBuilder`, as `flutter_svg` does not forward pointer events through transparent pixels.
 - Set `shouldRebuildWhenBoundsCalculated` to `true` to rebuild after bounds are available, as `details.bounds` may be null on first build.
+- `interactiveBuilder` replaces the widget for one extracted region. Always call
+  and return its `builder()` when the SVG region must remain visible; returning
+  `SizedBox.shrink()` intentionally hides that region.
 
 ## SVG Authoring Guidelines
 To ensure reliable interactivity, follow these guidelines when creating SVGs:
@@ -98,10 +122,21 @@ To ensure reliable interactivity, follow these guidelines when creating SVGs:
 ### Hit-Testing
 - Ensure interactive shapes have a fill (even transparent) to register hits, as `flutter_svg` does not pass pointer events through transparent pixels.
 - Mark the background with a unique ID (e.g., `background`) for background tap detection.
+- Prefer a dedicated, simplified hit-area SVG made from `<path>`, `<rect>`, or
+  `<g>` elements when click accuracy matters. Keep the same `viewBox` as the
+  visual SVG, give every hit area a stable ID, and layer/align it with the visual
+  SVG in the application. This avoids coupling input behavior to font
+  availability, glyph metrics, masks, or decorative details.
+- Selecting visual `<text>` directly is supported as a convenience, but its
+  bounds are approximate. A dedicated geometric hit area remains the recommended
+  production approach.
 
 ### ViewBox and Coordinates
 - Define a stable `viewBox` on the root `<svg>` for predictable scaling and bounds.
 - Keep elements within the `viewBox` and avoid large transforms outside expected bounds.
+- Element and nested group transforms are applied once per SVG subtree during
+  bounds extraction. Do not pre-transform path coordinates and keep the same
+  transform on a duplicated hit-area SVG.
 
 ### Performance
 - Inline fills and strokes for interactive elements instead of relying on complex `<defs>` or `<use>`.
@@ -140,6 +175,14 @@ To ensure reliable interactivity, follow these guidelines when creating SVGs:
 
 - **Bounds Timing**: Region bounds may be null on first build. Use `shouldRebuildWhenBoundsCalculated` to handle this.
 - **Hit-Testing**: Transparent pixels do not forward events; ensure shapes have a fill (even transparent).
+- **Text bounds are approximate**: Simple, single-line `<text>` supports `x`,
+  `y`, `dx`, `dy`, `font-size`, `font-family`, `font-weight`, `font-style`,
+  `letter-spacing`, `text-anchor`, inherited values, and transforms. Bounds are
+  measured with Flutter font metrics and may differ from `flutter_svg` when the
+  requested font is unavailable. Per-`<tspan>` positioning/styles, advanced
+  baselines, `textLength`, text on a path, vertical writing modes, and other
+  advanced SVG typography are not interpreted. Use explicit geometric hit areas
+  for those cases.
 - **SVG Features**: Avoid heavy use of `<use>`, external references, or complex `<defs>`, as they may cause unexpected behavior in `flutter_svg`.
 
 ## Features and Bugs

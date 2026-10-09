@@ -25,10 +25,31 @@ import 'parsers/bounds_parser_utilities.dart';
 /// 3. Call [parseSvgBounds] to obtain path-based bounds (in SVG coordinates).
 class InteractiveParser extends InteractiveParserDelegate {
   /// Creates an [InteractiveParser] with the given [asset] and [selectors].
-  InteractiveParser({required this.asset, this.selectors = const []});
+  /// Tạo [InteractiveParser] với [asset] và [selectors] được cung cấp.
+  InteractiveParser({required String asset, this.selectors = const []})
+      : provider = InteractiveSvgAssetProvider(asset);
 
-  /// The SVG asset path to load.
-  final String asset;
+  /// Creates an [InteractiveParser] backed by any supported SVG [provider].
+  /// Tạo [InteractiveParser] từ một SVG [provider] được hỗ trợ.
+  InteractiveParser.provider({
+    required this.provider,
+    this.selectors = const [],
+  });
+
+  /// Source used to load the raw SVG text.
+  /// Nguồn dùng để tải nội dung SVG thô.
+  final InteractiveSvgProvider provider;
+
+  /// The asset path when this parser uses an asset provider.
+  /// Đường dẫn asset khi parser này dùng asset provider.
+  String get asset {
+    final source = provider;
+    if (source is InteractiveSvgAssetProvider) {
+      return source.assetName;
+    }
+    // Preserve the legacy getter contract for asset-backed parsers. / Giữ hợp đồng getter cũ cho parser dùng asset.
+    throw StateError('This parser is not backed by an SVG asset.');
+  }
 
   /// The list of selectors defining interactive regions.C
   final Iterable<InteractiveSelector> selectors;
@@ -57,7 +78,8 @@ class InteractiveParser extends InteractiveParserDelegate {
     }
     _lock = true;
     try {
-      final svgString = await DefaultAssetBundle.of(context).loadString(asset);
+      // Load independently of the source type. / Tải độc lập với loại nguồn dữ liệu.
+      final svgString = await provider.load(context);
       final document = XmlDocument.parse(svgString);
       final svg = document.findElements('svg').firstOrNull;
       _currentContext = InteractiveParseContext(root: svg, document: document);
@@ -185,11 +207,12 @@ class InteractiveParser extends InteractiveParserDelegate {
 
   /// Checks if this parser is different from [other].
   ///
-  /// Returns true if the asset or selectors have changed.
+  /// Returns true if the provider or selectors have changed.
+  /// Trả về true khi provider hoặc selectors thay đổi.
   @override
   bool isChanged(covariant InteractiveParserDelegate other) {
     if (other is! InteractiveParser) return true;
-    return other.asset != asset ||
+    return other.provider != provider ||
         !const DeepCollectionEquality().equals(other.selectors, selectors);
   }
 

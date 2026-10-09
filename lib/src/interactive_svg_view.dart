@@ -119,6 +119,41 @@ class InteractiveSvgView extends StatefulWidget {
         shouldRebuildWhenBoundsCalculated: shouldRebuildWhenBoundsCalculated,
       );
 
+  /// Creates an [InteractiveSvgView] that loads SVG data from [provider].
+  /// Tạo [InteractiveSvgView] tải dữ liệu SVG từ [provider].
+  factory InteractiveSvgView.fromProvider({
+    Key? key,
+    required InteractiveSvgProvider provider,
+    Iterable<InteractiveSelector> selectors = const [],
+    ErrorBuilder? errorBuilder,
+    WidgetBuilder? placeholderBuilder,
+    InteractiveBuilder? interactiveBuilder,
+    void Function(InteractiveSelector selector)? onTap,
+    void Function()? onTapOutside,
+    BoxFit fit = BoxFit.contain,
+    Alignment alignment = Alignment.topLeft,
+    MarkerBuilder? markerBuilder,
+    void Function(BoundsList boundsData)? onBoundsCalculated,
+    bool shouldRebuildWhenBoundsCalculated = false,
+  }) =>
+      InteractiveSvgView(
+        key: key,
+        parserDelegate: InteractiveParser.provider(
+          provider: provider,
+          selectors: selectors,
+        ),
+        errorBuilder: errorBuilder,
+        placeholderBuilder: placeholderBuilder,
+        interactiveBuilder: interactiveBuilder,
+        onTap: onTap,
+        onTapOutside: onTapOutside,
+        fit: fit,
+        alignment: alignment,
+        markerBuilder: markerBuilder,
+        onBoundsCalculated: onBoundsCalculated,
+        shouldRebuildWhenBoundsCalculated: shouldRebuildWhenBoundsCalculated,
+      );
+
   /// Parser delegate responsible for loading/parsing the SVG and providing regions.
   final InteractiveParserDelegate parserDelegate;
 

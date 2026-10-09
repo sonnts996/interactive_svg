@@ -11,22 +11,11 @@ import 'package:xml/xml.dart';
 
 /// Parses a single SVG group/element and composes a union [Path] suitable for hit-testing.
 ///
-/// The returned [Path] is a union of drawable shapes found inside [data]. If any
-/// transform attributes exist on the element or its parents (matrix(...)), the
-/// first found transform is applied to the composed path. Mask and clip-path are
-/// respected where possible. If no drawable content is found this function returns null.
+/// The returned [Path] is a union of drawable shapes found inside [data]. Each
+/// transform is applied while traversing its element subtree. Mask and clip-path
+/// are respected where possible. If no drawable content is found this function returns null.
 Path? parseBoundsFromSvg(XmlNode data) {
   final subpaths = collectDrawablePaths(data);
-  Matrix4? transform;
-  XmlNode? current = data;
-  while (current != null) {
-    final transformStr = current.getAttribute('transform');
-    if (transformStr != null) {
-      transform = parseTransform(transformStr);
-      break;
-    }
-    current = current.parentElement;
-  }
 
   if (subpaths.isNotEmpty) {
     var combinedUnion = Path();
@@ -42,10 +31,6 @@ Path? parseBoundsFromSvg(XmlNode data) {
       strokedPath.addPath(combinedUnion, Offset.zero);
       combinedUnion =
           Path.combine(PathOperation.union, combinedUnion, strokedPath);
-    }
-
-    if (transform != null) {
-      combinedUnion = combinedUnion.transform(transform.storage);
     }
 
     return combinedUnion;
@@ -101,6 +86,8 @@ List<Path> collectDrawablePaths(XmlNode node, {bool skipMasks = true}) {
       shapePath = parsePolyline(element);
     } else if (tag == 'line') {
       shapePath = parseLine(element);
+    } else if (tag == 'text') {
+      shapePath = parseText(element);
     } else if (tag == 'use') {
       shapePath = parseUse(element);
     } else if (tag == 'g') {
@@ -111,11 +98,6 @@ List<Path> collectDrawablePaths(XmlNode node, {bool skipMasks = true}) {
 
 // Apply inner clip-path and mask if present
     if (shapePath != null) {
-      final localTransform = parseTransform(element.getAttribute('transform'));
-      if (localTransform != null) {
-        shapePath = shapePath.transform(localTransform.storage);
-      }
-
 // Check clip-path on element
       final clipPathUrl = element
           .getAttribute('clip-path')
@@ -175,6 +157,12 @@ List<Path> collectDrawablePaths(XmlNode node, {bool skipMasks = true}) {
 // Recurse into children
   for (final child in element.children) {
     paths.addAll(collectDrawablePaths(child, skipMasks: skipMasks));
+  }
+
+  // Apply this element's transform once to its complete subtree. / Áp dụng transform của phần tử đúng một lần cho toàn bộ cây con.
+  final localTransform = parseTransform(element.getAttribute('transform'));
+  if (localTransform != null) {
+    return paths.map((path) => path.transform(localTransform.storage)).toList();
   }
 
   return paths;
@@ -306,6 +294,102 @@ Path parseLine(XmlNode e) {
     ..moveTo(x1, y1)
     ..lineTo(x2, y2);
   return path;
+}
+
+/// Approximates a single SVG `<text>` element as a rectangular [Path].
+/// Xấp xỉ một phần tử SVG `<text>` đơn bằng [Path] hình chữ nhật.
+///
+/// Flutter font metrics are used because SVG glyph outlines are not exposed by
+/// `flutter_svg`. Basic inherited font attributes and `text-anchor` are
+/// supported. Per-`<tspan>` positioning, advanced baselines, text-on-path, and
+/// writing modes are intentionally not interpreted.
+/// Dùng font metrics của Flutter vì `flutter_svg` không cung cấp glyph outline.
+/// Hàm hỗ trợ thuộc tính font kế thừa cơ bản và `text-anchor`, nhưng không diễn
+/// giải vị trí riêng của `<tspan>`, baseline nâng cao, text-on-path hay writing mode.
+Path parseText(XmlElement e) {
+  final text = e.innerText;
+  if (text.isEmpty) return Path();
+
+  final fontSize = _parseSvgNumber(_inheritedAttribute(e, 'font-size')) ?? 16;
+  final fontFamily = _inheritedAttribute(e, 'font-family')
+      ?.split(',')
+      .first
+      .trim()
+      .replaceAll(RegExp(r'''^['"]|['"]$'''), '');
+  final painter = TextPainter(
+    text: TextSpan(
+      text: text,
+      style: TextStyle(
+        fontSize: fontSize,
+        fontFamily: fontFamily,
+        fontWeight: _parseFontWeight(_inheritedAttribute(e, 'font-weight')),
+        fontStyle: switch (_inheritedAttribute(e, 'font-style')) {
+          'italic' || 'oblique' => FontStyle.italic,
+          _ => FontStyle.normal,
+        },
+        letterSpacing:
+            _parseSvgNumber(_inheritedAttribute(e, 'letter-spacing')),
+      ),
+    ),
+    textDirection: TextDirection.ltr,
+    textScaler: TextScaler.noScaling,
+  )..layout();
+
+  final metrics = painter.computeLineMetrics();
+  if (metrics.isEmpty) return Path();
+
+  final x = (_parseSvgNumber(e.getAttribute('x')) ?? 0) +
+      (_parseSvgNumber(e.getAttribute('dx')) ?? 0);
+  final y = (_parseSvgNumber(e.getAttribute('y')) ?? 0) +
+      (_parseSvgNumber(e.getAttribute('dy')) ?? 0);
+  final anchor = _inheritedAttribute(e, 'text-anchor');
+  final left = switch (anchor) {
+    'middle' => x - painter.width / 2,
+    'end' => x - painter.width,
+    _ => x,
+  };
+  final line = metrics.first;
+
+  // SVG y is the text baseline, while Flutter rectangles start at the top. / SVG dùng y làm baseline, còn hình chữ nhật Flutter bắt đầu từ cạnh trên.
+  return Path()
+    ..addRect(
+      Rect.fromLTWH(
+        left,
+        y - line.ascent,
+        painter.width,
+        line.ascent + line.descent,
+      ),
+    );
+}
+
+/// Returns the nearest attribute value inherited through SVG ancestors.
+/// Trả về giá trị thuộc tính gần nhất được kế thừa qua các phần tử cha SVG.
+String? _inheritedAttribute(XmlElement element, String name) {
+  XmlElement? current = element;
+  while (current != null) {
+    final value = current.getAttribute(name);
+    if (value != null) return value;
+    current = current.parentElement;
+  }
+  return null;
+}
+
+/// Parses the first numeric SVG length component, including values ending in `px`.
+/// Parse thành phần số đầu tiên của độ dài SVG, bao gồm giá trị kết thúc bằng `px`.
+double? _parseSvgNumber(String? value) {
+  if (value == null) return null;
+  final match = RegExp(r'^\s*(-?(?:\d+(?:\.\d*)?|\.\d+))').firstMatch(value);
+  return match == null ? null : double.tryParse(match.group(1)!);
+}
+
+/// Maps common SVG font-weight values to Flutter font weights.
+/// Ánh xạ các giá trị font-weight SVG phổ biến sang font weight của Flutter.
+FontWeight _parseFontWeight(String? value) {
+  if (value == 'bold' || value == 'bolder') return FontWeight.bold;
+  final numericWeight = int.tryParse(value ?? '');
+  if (numericWeight == null) return FontWeight.normal;
+  final index = (numericWeight ~/ 100).clamp(1, 9) - 1;
+  return FontWeight.values[index];
 }
 
 /// Parse a <use> element by resolving its referenced element and combining its paths.

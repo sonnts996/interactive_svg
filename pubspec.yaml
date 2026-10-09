@@ -1,6 +1,6 @@
 name: interactive_svg
 description: "A lightweight Flutter package for rendering SVGs with selectable, interactive regions, supporting hit-testing, bounds extraction, and zoom/scroll functionality."
-version: 0.0.3
+version: 0.0.4
 homepage: https://github.com/sonnts996/interactive_svg
 
 environment:

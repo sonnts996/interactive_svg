@@ -1,3 +1,15 @@
+## 0.0.4
+
+- Add SVG providers for in-memory strings, Flutter assets, local files, and
+  network URLs while preserving the asset-based parser API.
+- Add `InteractiveSvgView.fromProvider`.
+- Fix duplicate SVG transform application that produced minuscule hit-test
+  regions for transformed paths, and apply nested transforms once per subtree.
+- Add approximate bounds for simple, single-line SVG `<text>` elements using
+  Flutter font metrics.
+- Document provider reload behavior, text-bound limitations, and the recommended
+  dedicated geometric hit-area SVG workflow.
+
 ## 0.0.3
 
 - Upgrade dependencies for Flutter 3.35.5 compatibility.

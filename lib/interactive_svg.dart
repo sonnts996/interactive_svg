@@ -1,6 +1,7 @@
 export 'src/bounds_test_painter.dart';
 export 'src/entities/interactive_parser_delegate.dart';
 export 'src/entities/interactive_selector.dart';
+export 'src/entities/interactive_svg_provider.dart';
 export 'src/entities/path_extension.dart';
 export 'src/entities/svg_bounds.dart';
 export 'src/entities/svg_bounds_factory.dart';
